@@ -3,10 +3,12 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
+	"github.com/tidwall/gjson"
 	"net/http"
 	"io"
 	"fmt"
 	"time"
+	"encoding/json"
 )
 
 func requestGem(gem string) string {
@@ -30,6 +32,51 @@ func requestGem(gem string) string {
 	return string(body)
 }
 
+type Node struct {
+	Id   int 		`json:"id"`
+	Name string `json:"name"`
+}
+// sid: source ID of node
+// tid: target ID of node
+type Link struct {
+	Sid   int		`json:"sid"`
+	Tid   int		`json:"tid"`
+}
+
+func nodes(gemResponse string) ([]byte, []byte) {
+	var nodes = []Node{}
+	var links = []Link{}
+	gem :=  gjson.Get(gemResponse, "name")
+	deps := gjson.Get(gemResponse, "dependencies.runtime").Array()
+	parentNode := Node{
+		0,
+		gem.String(),
+	}
+	nodes = append(nodes, parentNode)
+	for index, element := range deps {
+		link := Link{
+			0,
+			index + 1,
+		}
+		links = append(links, link)
+		node := Node{
+			index + 1,
+			element.Map()["name"].String(),
+		}
+		nodes = append(nodes, node)
+	}
+	nodesJSON, err := json.Marshal(nodes)
+	if err != nil {
+			fmt.Println(err)
+	}
+
+	linksJSON, err := json.Marshal(links)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return nodesJSON, linksJSON
+}
+
 func main() {
 	r := gin.New()
 
@@ -49,13 +96,6 @@ func main() {
 		)
 	}))
 
-	// // Recovery middleware recovers from any panics and writes a 500 if there was one.
-	// r.Use(gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
-	// 	if err, ok := recovered.(string); ok {
-	// 		c.String(http.StatusInternalServerError, fmt.Sprintf("error: %s", err))
-	// 	}
-	// 	c.AbortWithStatus(http.StatusInternalServerError)
-	// }))
 	r.Use(cors.New(cors.Config{
 		AllowMethods:     []string{"GET", "POST", "OPTIONS", "PUT"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "User-Agent", "Referrer", "Host", "Token"},
@@ -66,16 +106,13 @@ func main() {
 		MaxAge:           86400,
 	}))
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
-	})
-
 	r.GET("/gem/:gemname", func(c *gin.Context) {
 		gem := c.Param("gemname")
+		dependencies := requestGem(gem)
+		nodes, links := nodes(dependencies)
 		c.JSON(200, gin.H{
-			"message": requestGem(gem),
+			"nodes": string(nodes),
+			"links": string(links),
 		})
 	})
 	r.Run()
