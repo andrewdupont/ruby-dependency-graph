@@ -1,3 +1,4 @@
+# ruby-dependency-graph
+Visualization of ruby gem dependencies
 
- 
- ![ Search for gems and see dependency graph](demo.gif)
+![demo-graph-visualization](demo.gif)
