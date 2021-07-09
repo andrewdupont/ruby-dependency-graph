@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/chenyahui/gin-cache"
+	"github.com/chenyahui/gin-cache/persist"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -63,16 +65,16 @@ func dependencyTree(nodes []Node, links []Link, curNode Node) ([]Node, []Link) {
 	for _, dependency := range deps {
 		gemName := gjson.Get(dependency.String(), "name").String()
 		// Guard, this node has already been found.
+		// fmt.Println(gemName)
 		result, foundNode := nodeExists(gemName, nodes)
 		if result {
-			fmt.Println("already found", foundNode)
 			newLink := Link{curNode.Id, foundNode.Id}
 			links = append(links, newLink)
 			continue
 		}
 		newID := len(nodes)
 		newNode := Node{newID, gemName}
-		newLink := Link{curNode.Id, newNode.Id,}
+		newLink := Link{curNode.Id, newNode.Id}
 		nodes = append(nodes, newNode)
 		links = append(links, newLink)
 		nodes, links = dependencyTree(nodes, links, newNode)
@@ -128,13 +130,21 @@ func main() {
 		MaxAge:           86400,
 	}))
 
-	r.GET("/gem/:gemname", func(c *gin.Context) {
-		gem := c.Param("gemname")
-		nodes, links := fullDependencyTree(gem)
-		c.JSON(200, gin.H{
-			"nodes": nodes,
-			"links": links,
+
+	r.GET("/gem/:gemname",
+		cache.CacheByPath(cache.Options{
+			CacheDuration:       5 * time.Minute,
+			CacheStore:          persist.NewMemoryStore(10 * time.Minute),
+			DisableSingleFlight: true,
+		}),
+		func(c *gin.Context) {
+			gem := c.Param("gemname")
+			nodes, links := fullDependencyTree(gem)
+			c.JSON(200, gin.H{
+				"nodes": nodes,
+				"links": links,
+			})
 		})
-	})
+
 	r.Run()
 }
