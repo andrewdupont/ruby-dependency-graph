@@ -10,38 +10,42 @@
     </form>
     <d3-network :net-nodes="nodes" :net-links="links" :options="options">
     </d3-network>
+    <loading :active="isLoading"
+              :is-full-page="fullPage"/>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
 import D3Network from 'vue-d3-network';
+import Loading from 'vue-loading-overlay';
+import 'vue-loading-overlay/dist/vue-loading.css';
 
 export default {
   name: "Home",
   data() { return {
     gemName: '',
-    gemDeps: '',
+    isLoading: false,
+    fullPage: true,
     nodes: [],
     links: [],
     options:
       {
-        force: 3000,
-        nodeSize: 20,
+        force: 1000,
+        nodeSize: 10,
         nodeLabels: true,
-        linkWidth:5
+        linkWidth:5,
       }
   } },
   methods: {
-    getGemDependencies(gemName) {
+    async getGemDependencies(gemName) {
       var url = 'http://localhost:8080/gem/' + gemName
+      this.isLoading = true
       axios.get(url)
       .then((response) => {
-        // handle success
-        // console.log(response);
-        this.gemDeps = response.data
         this.nodes = JSON.parse(response.data.nodes)
         this.links = JSON.parse(response.data.links)
+        this.isLoading = false
       })
       .catch((error) => {
         // handle error
@@ -51,7 +55,8 @@ export default {
     },
   },
   components: {
-    D3Network
+    D3Network,
+    Loading
   },
 };
 </script>
