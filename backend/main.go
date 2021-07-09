@@ -13,7 +13,7 @@ import (
 
 func requestGem(gem string) string {
 	url := fmt.Sprintf("https://rubygems.org/api/v1/gems/%v", gem)
-	fmt.Println(url)
+	// fmt.Println(url)
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Accept", "application/json")
 	client := &http.Client{}
@@ -44,59 +44,60 @@ type Link struct {
 	Tid int `json:"tid"`
 }
 
-func nodes(gemResponse string) ([]byte, []byte) {
-	var nodes = []Node{}
-	var links = []Link{}
-	gem := gjson.Get(gemResponse, "name").String()
-	deps := gjson.Get(gemResponse, "dependencies.runtime").Array()
-	parentNode := Node{
-		0,
-		gem,
-	}
-	nodes = append(nodes, parentNode)
-	for index, element := range deps {
-		link := Link{
-			0,
-			index + 1,
+func nodeExists(name string, nodes []Node) (result bool, node Node) {
+	result = false
+	foundNode := Node{}
+	for _, node := range nodes {
+		if node.Name == name {
+			result = true
+			foundNode = node
+			break
 		}
-		links = append(links, link)
-		node := Node{
-			index + 1,
-			element.Map()["name"].String(),
-		}
-		nodes = append(nodes, node)
 	}
-	nodesJSON, err := json.Marshal(nodes)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	linksJSON, err := json.Marshal(links)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return nodesJSON, linksJSON
+	return result, foundNode
 }
 
-// def gem_dependency_tree(gem, edges)
-// for dependency in gem_dependencies(gem) do
-// 	next if dependency.empty?
-// 	next if edges.has_key? dependency['name']
+func dependencyTree(nodes []Node, links []Link, curNode Node) ([]Node, []Link) {
+	resp := requestGem(curNode.Name)
+	deps := gjson.Get(resp, "dependencies.runtime").Array()
+	for _, dependency := range deps {
+		gemName := gjson.Get(dependency.String(), "name").String()
+		// Guard, this node has already been found.
+		result, foundNode := nodeExists(gemName, nodes)
+		if result {
+			fmt.Println("already found", foundNode)
+			newLink := Link{curNode.Id, foundNode.Id}
+			links = append(links, newLink)
+			continue
+		}
+		newID := len(nodes)
+		newNode := Node{newID, gemName}
+		newLink := Link{curNode.Id, newNode.Id,}
+		nodes = append(nodes, newNode)
+		links = append(links, newLink)
+		nodes, links = dependencyTree(nodes, links, newNode)
+	}
+	return nodes, links
+}
 
-// 	if !edges.has_key? gem
-// 		edges[gem] = []
-// 	end
-// 	edges[gem] << dependency['name']
+func fullDependencyTree(gem string) (string, string) {
+	var nodes = []Node{}
+	var links = []Link{}
+	baseNode := Node{0, gem}
+	nodes = append(nodes, baseNode)
+	nodeArray, linkArray := dependencyTree(nodes, links, baseNode)
 
-// 	gem_dependency_tree(dependency['name'], edges)
-// 	end
-// 	return edges
-// end
+	nodesJSON, err := json.Marshal(nodeArray)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-// func dependencyTree(nodes links[]byte, gem string) ([]byte []byte) {
-// 	for _, dependency in requestGem(gem)
-// 	return []byte, []byte
-// }
+	linksJSON, err := json.Marshal(linkArray)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return string(nodesJSON), string(linksJSON)
+}
 
 func main() {
 	r := gin.New()
@@ -129,11 +130,10 @@ func main() {
 
 	r.GET("/gem/:gemname", func(c *gin.Context) {
 		gem := c.Param("gemname")
-		dependencies := requestGem(gem)
-		nodes, links := nodes(dependencies)
+		nodes, links := fullDependencyTree(gem)
 		c.JSON(200, gin.H{
-			"nodes": string(nodes),
-			"links": string(links),
+			"nodes": nodes,
+			"links": links,
 		})
 	})
 	r.Run()
