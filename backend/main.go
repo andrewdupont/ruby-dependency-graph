@@ -1,14 +1,14 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/gin-contrib/cors"
-	"github.com/tidwall/gjson"
-	"net/http"
-	"io"
-	"fmt"
-	"time"
 	"encoding/json"
+	"fmt"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
+	"io"
+	"net/http"
+	"time"
 )
 
 func requestGem(gem string) string {
@@ -17,40 +17,41 @@ func requestGem(gem string) string {
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Accept", "application/json")
 	client := &http.Client{}
-	resp, err := client.Do(req)		
+	resp, err := client.Do(req)
 	if err != nil {
-		panic(err);
+		panic(err)
 	}
 	if resp.StatusCode != 200 {
 		panic(resp.Status)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-	if err != nil{
-		panic(err);
+	if err != nil {
+		panic(err)
 	}
 	return string(body)
 }
 
 type Node struct {
-	Id   int 		`json:"id"`
+	Id   int    `json:"id"`
 	Name string `json:"name"`
 }
+
 // sid: source ID of node
 // tid: target ID of node
 type Link struct {
-	Sid   int		`json:"sid"`
-	Tid   int		`json:"tid"`
+	Sid int `json:"sid"`
+	Tid int `json:"tid"`
 }
 
 func nodes(gemResponse string) ([]byte, []byte) {
 	var nodes = []Node{}
 	var links = []Link{}
-	gem :=  gjson.Get(gemResponse, "name")
+	gem := gjson.Get(gemResponse, "name").String()
 	deps := gjson.Get(gemResponse, "dependencies.runtime").Array()
 	parentNode := Node{
 		0,
-		gem.String(),
+		gem,
 	}
 	nodes = append(nodes, parentNode)
 	for index, element := range deps {
@@ -67,7 +68,7 @@ func nodes(gemResponse string) ([]byte, []byte) {
 	}
 	nodesJSON, err := json.Marshal(nodes)
 	if err != nil {
-			fmt.Println(err)
+		fmt.Println(err)
 	}
 
 	linksJSON, err := json.Marshal(links)
@@ -77,6 +78,26 @@ func nodes(gemResponse string) ([]byte, []byte) {
 	return nodesJSON, linksJSON
 }
 
+// def gem_dependency_tree(gem, edges)
+// for dependency in gem_dependencies(gem) do
+// 	next if dependency.empty?
+// 	next if edges.has_key? dependency['name']
+
+// 	if !edges.has_key? gem
+// 		edges[gem] = []
+// 	end
+// 	edges[gem] << dependency['name']
+
+// 	gem_dependency_tree(dependency['name'], edges)
+// 	end
+// 	return edges
+// end
+
+// func dependencyTree(nodes links[]byte, gem string) ([]byte []byte) {
+// 	for _, dependency in requestGem(gem)
+// 	return []byte, []byte
+// }
+
 func main() {
 	r := gin.New()
 
@@ -84,15 +105,15 @@ func main() {
 
 		// your custom format
 		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-				param.ClientIP,
-				param.TimeStamp.Format(time.RFC1123),
-				param.Method,
-				param.Path,
-				param.Request.Proto,
-				param.StatusCode,
-				param.Latency,
-				param.Request.UserAgent(),
-				param.ErrorMessage,
+			param.ClientIP,
+			param.TimeStamp.Format(time.RFC1123),
+			param.Method,
+			param.Path,
+			param.Request.Proto,
+			param.StatusCode,
+			param.Latency,
+			param.Request.UserAgent(),
+			param.ErrorMessage,
 		)
 	}))
 
