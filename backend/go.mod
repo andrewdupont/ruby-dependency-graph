@@ -1,4 +1,4 @@
-module test_http
+module rubygems_deps_app
 
 go 1.16
 
